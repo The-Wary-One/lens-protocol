@@ -450,6 +450,15 @@ library Events {
     event FeeModuleBaseConstructed(address indexed moduleGlobals, uint256 timestamp);
 
     /**
+     * @notice Emitted when a module inheriting from the `SuperfluidModuleBase` is constructed.
+     *
+     * @param moduleGlobals The ModuleGlobals contract address used.
+     * @param superfluidHost The Superfluid host contract address used.
+     * @param timestamp The current block timestamp.
+     */
+    event SuperfluidModuleBaseConstructed(address indexed moduleGlobals, address indexed superfluidHost, uint256 timestamp);
+
+    /**
      * @notice Emitted when a module inheriting from the `ModuleBase` is constructed.
      *
      * @param hub The LensHub contract address used.

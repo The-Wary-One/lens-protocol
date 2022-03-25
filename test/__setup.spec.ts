@@ -1,10 +1,14 @@
-import { AbiCoder } from '@ethersproject/contracts/node_modules/@ethersproject/abi';
+import { AbiCoder } from '@ethersproject/abi';
+import deployFramework from '@superfluid-finance/ethereum-contracts/scripts/deploy-framework';
+import deployTestToken from '@superfluid-finance/ethereum-contracts/scripts/deploy-test-token';
+import deploySuperToken from '@superfluid-finance/ethereum-contracts/scripts/deploy-super-token';
+import { Framework, SuperToken } from '@superfluid-finance/sdk-core';
 import { parseEther } from '@ethersproject/units';
 import '@nomiclabs/hardhat-ethers';
 import { expect, use } from 'chai';
 import { solidity } from 'ethereum-waffle';
 import { BytesLike, Signer, Wallet } from 'ethers';
-import { ethers } from 'hardhat';
+import { ethers, web3 } from 'hardhat';
 import {
   ApprovalFollowModule,
   ApprovalFollowModule__factory,
@@ -41,6 +45,8 @@ import {
   PublishingLogic__factory,
   RevertCollectModule,
   RevertCollectModule__factory,
+  SuperfluidCFAFollowModule,
+  SuperfluidCFAFollowModule__factory,
   TimedFeeCollectModule,
   TimedFeeCollectModule__factory,
   TransparentUpgradeableProxy__factory,
@@ -48,6 +54,7 @@ import {
   LensPeripheryDataProvider__factory,
 } from '../typechain-types';
 import { LensHubLibraryAddresses } from '../typechain-types/factories/LensHub__factory';
+import currencyABI from '../artifacts/contracts/mocks/Currency.sol/Currency.json';
 import { FAKE_PRIVATEKEY, ZERO_ADDRESS } from './helpers/constants';
 import {
   computeContractAddress,
@@ -100,6 +107,9 @@ export let eventsLib: Events;
 export let moduleGlobals: ModuleGlobals;
 export let helper: Helper;
 export let peripheryDataProvider: LensPeripheryDataProvider;
+export let sf: Framework;
+export let fDAI: Currency;
+export let fDAIx: SuperToken;
 
 /* Modules */
 
@@ -114,6 +124,7 @@ export let limitedTimedFeeCollectModule: LimitedTimedFeeCollectModule;
 // Follow
 export let approvalFollowModule: ApprovalFollowModule;
 export let feeFollowModule: FeeFollowModule;
+export let superfluidCFAFollowModule: SuperfluidCFAFollowModule;
 export let mockFollowModule: MockFollowModule;
 
 // Reference
@@ -130,6 +141,11 @@ export function makeSuiteCleanRoom(name: string, tests: () => void) {
       await revertToSnapshot();
     });
   });
+}
+
+export { deployTestToken, deploySuperToken };
+export function errorHandler(err) {
+  if (err) throw err;
 }
 
 before(async function () {
@@ -205,6 +221,39 @@ before(async function () {
   // Currency
   currency = await new Currency__factory(deployer).deploy();
 
+  // Superfluid
+  //deploy the framework
+  await deployFramework(errorHandler, {
+    web3,
+    from: deployerAddress,
+  });
+  //deploy a fake erc20 token
+  await deployTestToken(errorHandler, [":", "fDAI"], {
+      web3,
+      from: deployerAddress,
+  });
+  // deploy a fake erc20 wrapper super token around the currency token
+  await deploySuperToken(errorHandler, [':', 'fDAI'], {
+    web3,
+    from: deployerAddress,
+  });
+  // initialize the superfluid framework...put custom and web3 only bc we are using hardhat locally
+  sf = await Framework.create({
+    networkName: 'custom',
+    provider: ethers.provider,
+    dataMode: 'WEB3_ONLY',
+    resolverAddress: process.env.RESOLVER_ADDRESS, //this is how you get the resolver address
+    protocolReleaseVersion: 'test',
+  });
+  //superSigner = sf.createSigner({
+  //  signer: deployer,
+  //  provider: ethers.provider,
+  //}
+  //use the framework to get the super toen
+  fDAIx = await sf.loadSuperToken('fDAIx');
+  const fDAIAddress = fDAIx.underlyingToken.address;
+  fDAI = new ethers.Contract(fDAIAddress, currencyABI.abi, deployer) as Currency; // FIXME
+
   // Modules
   emptyCollectModule = await new EmptyCollectModule__factory(deployer).deploy(lensHub.address);
   revertCollectModule = await new RevertCollectModule__factory(deployer).deploy();
@@ -230,6 +279,11 @@ before(async function () {
     moduleGlobals.address
   );
   approvalFollowModule = await new ApprovalFollowModule__factory(deployer).deploy(lensHub.address);
+  superfluidCFAFollowModule = await new SuperfluidCFAFollowModule__factory(deployer).deploy(
+    lensHub.address,
+    moduleGlobals.address,
+    sf.host.hostContract.address
+  );
   followerOnlyReferenceModule = await new FollowerOnlyReferenceModule__factory(deployer).deploy(
     lensHub.address
   );

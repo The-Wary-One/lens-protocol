@@ -1,6 +1,11 @@
 import '@nomiclabs/hardhat-ethers';
+import deployFramework from '@superfluid-finance/ethereum-contracts/scripts/deploy-framework';
+import deployTestToken from '@superfluid-finance/ethereum-contracts/scripts/deploy-test-token';
+import deploySuperToken from '@superfluid-finance/ethereum-contracts/scripts/deploy-super-token';
+import { Framework, SuperToken } from '@superfluid-finance/sdk-core';
 import { hexlify, keccak256, RLP } from 'ethers/lib/utils';
 import fs from 'fs';
+import '@nomiclabs/hardhat-web3';
 import { task } from 'hardhat/config';
 import {
   LensHub__factory,
@@ -18,6 +23,7 @@ import {
   ModuleGlobals__factory,
   PublishingLogic__factory,
   RevertCollectModule__factory,
+  SuperfluidCFAFollowModule__factory,
   TimedFeeCollectModule__factory,
   TransparentUpgradeableProxy__factory,
   ProfileTokenURILogic__factory,
@@ -131,6 +137,33 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
     new Currency__factory(deployer).deploy({ nonce: deployerNonce++ })
   );
 
+  // Superfluid
+  function errorHandler(err) {
+    if (err) throw err;
+  }
+  //deploy the framework
+  await deployFramework(errorHandler, {
+    from: deployer.address,
+  });
+  //deploy a fake erc20 token
+  await deployTestToken(errorHandler, [":", "fDAI"], {
+      web3: hre.web3,
+      from: deployer.address,
+  });
+  // deploy a fake erc20 wrapper super token around the currency token
+  await deploySuperToken(errorHandler, [':', 'fDAI'], {
+    web3: hre.web3,
+    from: deployer.address,
+  });
+  // initialize the superfluid framework...put custom and web3 only bc we are using hardhat locally
+  const sf = await Framework.create({
+    networkName: 'custom',
+    provider: ethers.provider,
+    dataMode: 'WEB3_ONLY',
+    resolverAddress: process.env.RESOLVER_ADDRESS, //this is how you get the resolver address
+    protocolReleaseVersion: 'test',
+  });
+
   // Deploy collect modules
   console.log('\n\t-- Deploying feeCollectModule --');
   const feeCollectModule = await deployContract(
@@ -179,6 +212,15 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
   const approvalFollowModule = await deployContract(
     new ApprovalFollowModule__factory(deployer).deploy(lensHub.address, { nonce: deployerNonce++ })
   );
+  console.log('\n\t-- Deploying superfluidCFAFollowModule --');
+  const superfluidCFAFollowModule = await deployContract(
+    new SuperfluidCFAFollowModule__factory(deployer).deploy(
+      lensHub.address,
+      moduleGlobals.address,
+      sf.settings.config.hostAddress,
+      { nonce: deployerNonce++ }
+    )
+  );
 
   // Deploy reference module
   console.log('\n\t-- Deploying followerOnlyReferenceModule --');
@@ -224,6 +266,9 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
   await waitForTx(
     lensHub.whitelistFollowModule(approvalFollowModule.address, true, { nonce: governanceNonce++ })
   );
+  await waitForTx(
+    lensHub.whitelistFollowModule(superfluidCFAFollowModule.address, true, { nonce: governanceNonce++ })
+  );
 
   // Whitelist the reference module
   console.log('\n\t-- Whitelisting Reference Module --');
@@ -260,6 +305,7 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
     'empty collect module': emptyCollectModule.address,
     'fee follow module': feeFollowModule.address,
     'approval follow module': approvalFollowModule.address,
+    'superfluid cfa follow module': superfluidCFAFollowModule.address,
     'follower only reference module': followerOnlyReferenceModule.address,
   };
   const json = JSON.stringify(addrs, null, 2);
