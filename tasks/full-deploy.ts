@@ -143,6 +143,7 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
   }
   //deploy the framework
   await deployFramework(errorHandler, {
+    web3: hre.web3,
     from: deployer.address,
   });
   //deploy a fake erc20 token
@@ -163,7 +164,8 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
     resolverAddress: process.env.RESOLVER_ADDRESS, //this is how you get the resolver address
     protocolReleaseVersion: 'test',
   });
-
+  // because of the superfluid scripts
+  deployerNonce = await ethers.provider.getTransactionCount(deployer.address);
   // Deploy collect modules
   console.log('\n\t-- Deploying feeCollectModule --');
   const feeCollectModule = await deployContract(

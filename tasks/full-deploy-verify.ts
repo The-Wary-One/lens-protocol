@@ -172,6 +172,7 @@ task('full-deploy-verify', 'deploys the entire Lens Protocol with explorer verif
     }
     //deploy the framework
     await deployFramework(errorHandler, {
+      web3: hre.web3,
       from: deployer.address,
     });
     //deploy a fake erc20 token
@@ -193,6 +194,8 @@ task('full-deploy-verify', 'deploys the entire Lens Protocol with explorer verif
       protocolReleaseVersion: 'test',
     });
 
+    // because of the superfluid scripts
+    deployerNonce = await ethers.provider.getTransactionCount(deployer.address);
     // Deploy collect modules
     console.log('\n\t-- Deploying feeCollectModule --');
     const feeCollectModule = await deployWithVerify(
