@@ -20,7 +20,7 @@
     "hardhat:docker": "hardhat --network hardhatevm_docker",
     "hardhat:mumbai": "hardhat --network mumbai",
     "hardhat:matic": "hardhat --network matic",
-    "compile": "SKIP_LOAD=true hardhat clean && SKIP_LOAD=true hardhat compile",
+    "compile": "SKIP_LOAD=true hardhat clean && SKIP_LOAD=true hardhat compile && cp ./artifacts/contracts/core/LensHub.sol/LensHub.json ../react-app/src/contracts/LensHub.json",
     "console:fork": "MAINNET_FORK=true hardhat console",
     "format": "prettier --write .",
     "lint": "eslint ."

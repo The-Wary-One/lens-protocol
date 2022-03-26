@@ -29,7 +29,7 @@ import {
   ProfileTokenURILogic__factory,
   LensPeripheryDataProvider__factory,
 } from '../typechain-types';
-import { deployWithVerify, waitForTx } from './helpers/utils';
+import { deployWithVerify, waitForTx, ProtocolState } from './helpers/utils';
 
 const TREASURY_FEE_BPS = 50;
 const LENS_HUB_NFT_NAME = 'Various Vegetables';
@@ -340,6 +340,12 @@ task('full-deploy-verify', 'deploys the entire Lens Protocol with explorer verif
       lensHub.whitelistReferenceModule(superfluidCFAFollowModule.address, true, {
         nonce: governanceNonce++,
       })
+    );
+
+    // Unpause the protocol
+    console.log('\n\t-- Unpause the protocol --');
+    await waitForTx(
+      lensHub.connect(governance).setState(ProtocolState.Unpaused, { nonce: governanceNonce++ })
     );
 
     // Save and log the addresses

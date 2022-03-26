@@ -29,7 +29,7 @@ import {
   ProfileTokenURILogic__factory,
   LensPeripheryDataProvider__factory,
 } from '../typechain-types';
-import { deployContract, waitForTx } from './helpers/utils';
+import { deployContract, waitForTx, ProtocolState } from './helpers/utils';
 
 const TREASURY_FEE_BPS = 50;
 const LENS_HUB_NFT_NAME = 'Various Vegetables';
@@ -286,6 +286,12 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
     moduleGlobals
       .connect(governance)
       .whitelistCurrency(currency.address, true, { nonce: governanceNonce++ })
+  );
+
+  // Unpause the protocol
+  console.log('\n\t-- Unpause the protocol --');
+  await waitForTx(
+    lensHub.connect(governance).setState(ProtocolState.Unpaused, { nonce: governanceNonce++ })
   );
 
   // Save and log the addresses
