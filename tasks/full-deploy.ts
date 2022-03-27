@@ -28,8 +28,10 @@ import {
   TransparentUpgradeableProxy__factory,
   ProfileTokenURILogic__factory,
   LensPeripheryDataProvider__factory,
+  Currency,
 } from '../typechain-types';
 import { deployContract, waitForTx, ProtocolState } from './helpers/utils';
+import currencyABI from '../artifacts/contracts/mocks/Currency.sol/Currency.json';
 
 const TREASURY_FEE_BPS = 50;
 const LENS_HUB_NFT_NAME = 'Various Vegetables';
@@ -293,6 +295,17 @@ task('full-deploy', 'deploys the entire Lens Protocol').setAction(async ({}, hre
   await waitForTx(
     lensHub.connect(governance).setState(ProtocolState.Unpaused, { nonce: governanceNonce++ })
   );
+
+  // Whitelist profile creators
+  console.log('\n\t-- Whitelist profile creators --');
+  await waitForTx(
+    lensHub.connect(governance).whitelistProfileCreator(governance.address, true, { nonce: governanceNonce++ })
+  );
+
+  // Mint super token
+  const fDAIx = await sf.loadSuperToken("fDAI");
+  const fDAI = new ethers.Contract(fDAIx.underlyingToken.address, currencyABI.abi, deployer) as Currency; // FIXME
+  await waitForTx(fDAI.mint(governance.address, ethers.utils.parseEther("100000000")))
 
   // Save and log the addresses
   const addrs = {

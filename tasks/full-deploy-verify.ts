@@ -351,6 +351,7 @@ task('full-deploy-verify', 'deploys the entire Lens Protocol with explorer verif
     // Save and log the addresses
     const addrs = {
       'lensHub proxy': lensHub.address,
+      'governance': governance.address,
       'lensHub impl:': lensHubImpl.address,
       'publishing logic lib': publishingLogic.address,
       'interaction logic lib': interactionLogic.address,
